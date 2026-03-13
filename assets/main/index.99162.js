@@ -567,16 +567,19 @@ window.__require = function e(t, n, r) {
     exports.ExpandingWildsCommand = exports.WaitForDropsCommand = exports.CascadeStepCommand = void 0;
     var SlotSymbol9999_1 = require("./SlotSymbol9999");
     var CascadeStepCommand = function() {
-      function CascadeStepCommand(reelDataList, ownerNode) {
+      function CascadeStepCommand(reelDataList, ownerNode, stepData, onStepExecute) {
         this.duration = 0;
         this._hideDuration = .25;
         this._scheduledCallback = null;
         this._dropHandler = null;
         this._reelDataList = reelDataList;
         this._ownerNode = ownerNode;
+        this._stepData = stepData;
+        this._onStepExecute = onStepExecute;
       }
       CascadeStepCommand.prototype.execute = function(onComplete) {
         var _this = this;
+        this._onStepExecute && this._stepData && this._onStepExecute(this._stepData);
         this._reelDataList.forEach(function(data) {
           data.deletions.forEach(function(del) {
             var row = del.coordinates.row;
@@ -1244,47 +1247,15 @@ window.__require = function e(t, n, r) {
         return _this;
       }
       Director.prototype.onLoad = function() {
-        return __awaiter(this, void 0, void 0, function() {
-          return __generator(this, function(_a) {
-            switch (_a.label) {
-             case 0:
-              this.gameNode.active = false;
-              return [ 4, this.init() ];
-
-             case 1:
-              _a.sent();
-              return [ 2 ];
-            }
-          });
-        });
+        this.init();
       };
       Director.prototype.init = function() {
-        return __awaiter(this, void 0, void 0, function() {
-          return __generator(this, function(_a) {
-            switch (_a.label) {
-             case 0:
-              return [ 4, this.initNetwork() ];
-
-             case 1:
-              _a.sent();
-              return [ 4, this.setupGame() ];
-
-             case 2:
-              _a.sent();
-              return [ 2 ];
-            }
-          });
-        });
+        this.setupGame();
+        this.initNetwork();
       };
       Director.prototype.setupGame = function() {
-        return __awaiter(this, void 0, void 0, function() {
-          return __generator(this, function(_a) {
-            this.initGameDataWriter();
-            this.setupGameController();
-            this.gameNode.active = true;
-            return [ 2 ];
-          });
-        });
+        this.initGameDataWriter();
+        this.setupGameController();
       };
       Director.prototype.initGameDataWriter = function() {
         this._gameDataWriter = new GameDataWriter_1.GameDataWriter();
@@ -1309,6 +1280,7 @@ window.__require = function e(t, n, r) {
              case 1:
               response = _a.sent();
               cc.log("Player authenticate:", response);
+              response && this.executeScripts(this._gameDataWriter.makeScriptSetupGame(response));
               return [ 2 ];
             }
           });
@@ -1339,13 +1311,13 @@ window.__require = function e(t, n, r) {
           });
         });
       };
-      Director.prototype.callApiGetSpinResult = function() {
+      Director.prototype.callApiGetSpinResult = function(betAmount) {
         return __awaiter(this, void 0, void 0, function() {
           var response;
           return __generator(this, function(_a) {
             switch (_a.label) {
              case 0:
-              return [ 4, NetworkManagerComp_1.NetworkManagerComp.instance.callApiGetSpinResult() ];
+              return [ 4, NetworkManagerComp_1.NetworkManagerComp.instance.callApiGetSpinResult(betAmount) ];
 
              case 1:
               response = _a.sent();
@@ -1583,7 +1555,7 @@ window.__require = function e(t, n, r) {
       };
       GameConfig9999.prototype.gameConfig = function() {
         return {
-          AUTO_SPIN_VALUES: [ 5, 25, 50, 100, 200, 500, 1e3, 2e3, 5e3 ]
+          BET_AMOUNTS: [ 10, 20, 40, 60, 80, 100, 200, 300, 500, 800, 1e3, 2e3, 3e3, 5e3 ]
         };
       };
       GameConfig9999 = __decorate([ ccclass ], GameConfig9999);
@@ -1660,7 +1632,9 @@ window.__require = function e(t, n, r) {
       GameConfigManagerComp.prototype.baseConfig = function() {
         return {
           version: "1.0.0",
-          debugMode: true
+          debugMode: true,
+          AUTO_SPIN_VALUES: [ 5, 25, 50, 100, 200, 500, 1e3, 2e3, 5e3 ],
+          BET_AMOUNTS: []
         };
       };
       GameConfigManagerComp.prototype.getConfigByKey = function(key) {
@@ -1709,57 +1683,8 @@ window.__require = function e(t, n, r) {
     var GameController9999 = function(_super) {
       __extends(GameController9999, _super);
       function GameController9999() {
-        var _this = null !== _super && _super.apply(this, arguments) || this;
-        _this.btnAutoSpin = null;
-        _this._autoSpinValue = 0;
-        return _this;
+        return null !== _super && _super.apply(this, arguments) || this;
       }
-      GameController9999.prototype.setupUI = function() {
-        _super.prototype.setupUI.call(this);
-      };
-      GameController9999.prototype.listenNodeEvents = function() {
-        _super.prototype.listenNodeEvents.call(this);
-        this.btnAutoSpin.on("click", this.onClickAutoSpin, this);
-      };
-      GameController9999.prototype.listenScriptsEvent = function() {
-        _super.prototype.listenScriptsEvent.call(this);
-      };
-      GameController9999.prototype.onClickAutoSpin = function() {
-        var _this = this;
-        this._autoSpinValue ? this.stopAutoSpin() : this.showPopup(Declaration9999_1.PopupConfig.popupName().SELECT, {
-          data: {
-            title: "Auto Spin",
-            message: "Select number of spins",
-            textConfirm: "Yes",
-            textCancel: "No",
-            cbConfirm: function(value) {
-              _this._autoSpinValue = value;
-              _this.sendAutoSpin();
-            },
-            cbCancel: function() {},
-            selectData: this.getConfig().getConfigByKey("AUTO_SPIN_VALUES")
-          }
-        });
-      };
-      GameController9999.prototype.sendAutoSpin = function() {
-        cc.log("start auto spin", this._autoSpinValue);
-        this.spin();
-        this.updateAutoSpinValue();
-      };
-      GameController9999.prototype.updateAutoSpinValue = function() {
-        --this._autoSpinValue;
-        this.btnAutoSpin.getComponentInChildren(cc.Label).string = this._autoSpinValue + "\nStop";
-      };
-      GameController9999.prototype.stopAutoSpin = function() {
-        cc.log("stop auto spin");
-        this.btnAutoSpin.getComponentInChildren(cc.Label).string = "Auto";
-        this._autoSpinValue = 0;
-      };
-      GameController9999.prototype.onSpinComplete = function(data) {
-        this._autoSpinValue > 0 && this.sendAutoSpin();
-        _super.prototype.onSpinComplete.call(this, data);
-      };
-      __decorate([ property(cc.Node) ], GameController9999.prototype, "btnAutoSpin", void 0);
       GameController9999 = __decorate([ ccclass ], GameController9999);
       return GameController9999;
     }(Declaration9999_1.GameController);
@@ -1803,13 +1728,21 @@ window.__require = function e(t, n, r) {
     var PopupConfig_1 = require("../Constants/PopupConfig");
     var GameDataEvents_1 = require("../DataModel/GameDataEvents");
     var SubjectComp_1 = require("../Patterns/Observer/SubjectComp");
+    var api_1 = require("../Managers/api");
     var _a = cc._decorator, ccclass = _a.ccclass, property = _a.property;
     var GameController = function(_super) {
       __extends(GameController, _super);
       function GameController() {
         var _this = null !== _super && _super.apply(this, arguments) || this;
         _this.btnSpin = null;
+        _this.btnAutoSpin = null;
+        _this.btnNewBet = null;
         _this.reelControl = null;
+        _this.lblWinAmount = null;
+        _this.lblBalanceAmount = null;
+        _this.lblBetAmount = null;
+        _this._autoSpinValue = -1;
+        _this._betAmount = 0;
         _this._currentRoundId = "";
         _this._pendingSteps = null;
         _this._pendingExpandingWilds = null;
@@ -1820,17 +1753,23 @@ window.__require = function e(t, n, r) {
         this.setupUI();
         this.listenNodeEvents();
         this.listenScriptsEvent();
-        this._apiListener && this._apiListener.callApiGetSession();
       };
       GameController.prototype.setupUI = function() {
-        this.btnSpin.getComponent(cc.Button).interactable = false;
+        this.updateBetAmount(this.getConfig().getConfigByKey("BET_AMOUNTS")[0]);
+        this.updateWinAmount(0);
+        this.updateBalanceAmount(0);
+        this.updateSpinButtonState(false);
+        this.updateAutoSpinButtonState(false);
       };
       GameController.prototype.listenNodeEvents = function() {
         this.btnSpin.on("click", this.onClickSpin, this);
+        this.btnAutoSpin.on("click", this.onClickAutoSpin, this);
+        this.btnNewBet.on("click", this.onClickNewBet, this);
         this.reelControl.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.CASCADE_ALL_DONE, this._onCascadeAllDone, this);
         this.reelControl.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.SPIN_ALL_DONE, this._onSpinAllDone, this);
       };
       GameController.prototype.listenScriptsEvent = function() {
+        this.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.SETUP_GAME, this.onSetupGame, this);
         this.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.SPIN_RESULT, this.onSpinResult, this);
         this.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.SPIN_COMPLETE, this.onSpinComplete, this);
         this.node.on(GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.PIN_RESTORE_NOTIFY, this.onSpinRestoreNotify, this);
@@ -1841,25 +1780,81 @@ window.__require = function e(t, n, r) {
         cc.log("setApiListener", listener);
       };
       GameController.prototype.onClickSpin = function() {
-        this.btnSpin.getComponent(cc.Button).interactable = false;
+        this.updateSpinButtonState(false);
+        this.updateAutoSpinButtonState(this._autoSpinValue > 0);
         this.spin();
       };
+      GameController.prototype.onClickNewBet = function() {
+        var _this = this;
+        this.showPopup(PopupConfig_1.PopupConfig.popupName().SELECT, {
+          data: {
+            title: "New Bet",
+            message: "Select bet amount",
+            textConfirm: "Yes",
+            textCancel: "No",
+            cbConfirm: function(value) {
+              _this.updateBetAmount(value);
+            },
+            cbCancel: function() {},
+            selectData: this.getConfig().getConfigByKey("BET_AMOUNTS")
+          }
+        });
+      };
+      GameController.prototype.onClickAutoSpin = function() {
+        var _this = this;
+        this._autoSpinValue <= 0 ? this.showPopup(PopupConfig_1.PopupConfig.popupName().SELECT, {
+          data: {
+            title: "Auto Spin",
+            message: "Select number of spins",
+            textConfirm: "Yes",
+            textCancel: "No",
+            cbConfirm: function(value) {
+              _this._autoSpinValue = value;
+              _this.sendAutoSpin();
+            },
+            cbCancel: function() {},
+            selectData: this.getConfig().getConfigByKey("AUTO_SPIN_VALUES")
+          }
+        }) : this.stopAutoSpin();
+      };
       GameController.prototype.spin = function() {
-        this._apiListener && this._apiListener.callApiGetSpinResult();
+        this._apiListener && this._apiListener.callApiGetSpinResult(this._betAmount);
         this.reelControl.startSpin();
+      };
+      GameController.prototype.sendAutoSpin = function() {
+        cc.log("start auto spin", this._autoSpinValue);
+        this.updateSpinButtonState(false);
+        this.spin();
+        this.updateAutoSpinValue();
+      };
+      GameController.prototype.updateAutoSpinValue = function() {
+        --this._autoSpinValue;
+        this._autoSpinValue <= 0 ? this.stopAutoSpin() : this.btnAutoSpin.getComponentInChildren(cc.Label).string = this._autoSpinValue + "\nStop";
+      };
+      GameController.prototype.stopAutoSpin = function() {
+        cc.log("stop auto spin");
+        this.btnAutoSpin.getComponentInChildren(cc.Label).string = "Auto";
+        this._autoSpinValue = -1;
       };
       GameController.prototype.onLastSession = function(data) {
         cc.warn("onLastSession", data);
         if (!data || Array.isArray(data.rounds) && 0 === data.rounds.length) {
-          this.btnSpin.getComponent(cc.Button).interactable = true;
+          this.updateSpinButtonState(true);
+          this.updateAutoSpinButtonState(true);
           return;
         }
+      };
+      GameController.prototype.onSetupGame = function(data) {
+        cc.warn("onSetupGame", data);
+        this.updateBalanceAmount(api_1.GameAPI.instance.toDisplayAmount(data.balance));
+        this._apiListener && this._apiListener.callApiGetSession();
       };
       GameController.prototype.onSpinResult = function(data) {
         cc.warn("onSpinResult", data);
         var steps = data.wager.data;
         this._currentRoundId = data.roundId || "";
         var step0 = steps[0];
+        this.updateWinAmount(0);
         this._emitCounterUpdate(step0.counters);
         var isPowerMode = "BASE_POWER_MODE" === step0.state;
         var expandingWilds = step0.transforms && step0.transforms.EXPANDING_WILDS_MODIFIER;
@@ -1875,6 +1870,7 @@ window.__require = function e(t, n, r) {
         this._pendingSteps = null;
         this._pendingExpandingWilds = null;
         if (!steps) return;
+        this.updateWinAmount(api_1.GameAPI.instance.toDisplayAmount(steps[0].round_winnings));
         expandingWilds ? this.reelControl.applyExpandingWilds(expandingWilds, function() {
           _this._processCascades(steps);
         }) : this._processCascades(steps);
@@ -1884,7 +1880,9 @@ window.__require = function e(t, n, r) {
         if (steps.length > 1) {
           var cascadeSteps_1 = steps.slice(1);
           this.scheduleOnce(function() {
-            _this.reelControl.setCascadeQueue(cascadeSteps_1);
+            _this.reelControl.setCascadeQueue(cascadeSteps_1, function(step) {
+              _this.updateWinAmount(api_1.GameAPI.instance.toDisplayAmount(step.round_winnings));
+            });
           }, .5);
         } else this._completeRound();
       };
@@ -1901,12 +1899,26 @@ window.__require = function e(t, n, r) {
       };
       GameController.prototype.onSpinComplete = function(data) {
         cc.warn("onSpinComplete", data);
-        this.btnSpin.getComponent(cc.Button).interactable = true;
+        data && null != data.balance && this.updateBalanceAmount(api_1.GameAPI.instance.toDisplayAmount(data.balance));
+        this._autoSpinValue > 0 && this.sendAutoSpin();
+        this.updateSpinButtonState(true);
+        this.updateAutoSpinButtonState(true);
+      };
+      GameController.prototype.updateWinAmount = function(value) {
+        this.lblWinAmount && (this.lblWinAmount.string = value.toFixed(2));
+      };
+      GameController.prototype.updateBalanceAmount = function(value) {
+        this.lblBalanceAmount && (this.lblBalanceAmount.string = value.toFixed(2));
+      };
+      GameController.prototype.updateBetAmount = function(value) {
+        this._betAmount = value;
+        this.lblBetAmount.string = value.toFixed(2);
       };
       GameController.prototype.onSpinRestoreNotify = function(data) {
         var _this = this;
         cc.warn("onSpinRestoreNotify", data);
-        this.btnSpin.getComponent(cc.Button).interactable = false;
+        this.updateSpinButtonState(false);
+        this.updateAutoSpinButtonState(false);
         this.showPopup(PopupConfig_1.PopupConfig.popupName().NOTIFY, {
           data: {
             title: "Session Recovery",
@@ -1918,13 +1930,26 @@ window.__require = function e(t, n, r) {
               _this._apiListener && _this._apiListener.callApiSpinRestore();
             },
             cbCancel: function() {
-              _this.btnSpin.getComponent(cc.Button).interactable = true;
+              _this.updateSpinButtonState(true);
+              _this.updateAutoSpinButtonState(true);
             }
           }
         });
       };
+      GameController.prototype.updateSpinButtonState = function(interactable) {
+        this._autoSpinValue > 0 && (interactable = false);
+        this.btnSpin.getComponent(cc.Button).interactable = interactable;
+      };
+      GameController.prototype.updateAutoSpinButtonState = function(interactable) {
+        this.btnAutoSpin.getComponent(cc.Button).interactable = interactable;
+      };
       __decorate([ property(cc.Node) ], GameController.prototype, "btnSpin", void 0);
+      __decorate([ property(cc.Node) ], GameController.prototype, "btnAutoSpin", void 0);
+      __decorate([ property(cc.Node) ], GameController.prototype, "btnNewBet", void 0);
       __decorate([ property(SubjectComp_1.SubjectComp) ], GameController.prototype, "reelControl", void 0);
+      __decorate([ property(cc.Label) ], GameController.prototype, "lblWinAmount", void 0);
+      __decorate([ property(cc.Label) ], GameController.prototype, "lblBalanceAmount", void 0);
+      __decorate([ property(cc.Label) ], GameController.prototype, "lblBetAmount", void 0);
       GameController = __decorate([ ccclass ], GameController);
       return GameController;
     }(SubjectComp_1.SubjectComp);
@@ -1933,6 +1958,7 @@ window.__require = function e(t, n, r) {
   }, {
     "../Constants/PopupConfig": "PopupConfig",
     "../DataModel/GameDataEvents": "GameDataEvents",
+    "../Managers/api": "api",
     "../Patterns/Observer/SubjectComp": "SubjectComp"
   } ],
   GameDataEvents: [ function(require, module, exports) {
@@ -1946,6 +1972,7 @@ window.__require = function e(t, n, r) {
     var GameDataEvents = function() {
       function GameDataEvents() {}
       GameDataEvents.SCRIPT_EVENTS = {
+        SETUP_GAME: "setupGame",
         SPIN_RESULT: "spinResult",
         PIN_RESTORE_NOTIFY: "spinRestoreNotify",
         SPIN_RESTORE: "spinRestore",
@@ -2070,6 +2097,14 @@ window.__require = function e(t, n, r) {
         this._lastSpinResult = null;
         this._parser = new GameDataParser_1.GameDataParser();
       }
+      GameDataWriter.prototype.makeScriptSetupGame = function(res) {
+        var scripts = [];
+        scripts.push({
+          code: GameDataEvents_1.GameDataEvents.SCRIPT_EVENTS.SETUP_GAME,
+          data: res
+        });
+        return scripts;
+      };
       GameDataWriter.prototype.makeScriptLastSession = function(res) {
         var scripts = [];
         scripts.push({
@@ -2596,12 +2631,12 @@ window.__require = function e(t, n, r) {
           });
         });
       };
-      NetworkManagerComp.prototype.callApiGetSpinResult = function() {
+      NetworkManagerComp.prototype.callApiGetSpinResult = function(betAmount) {
         return __awaiter(this, void 0, void 0, function() {
           return __generator(this, function(_a) {
             switch (_a.label) {
              case 0:
-              return [ 4, api_1.GameAPI.instance.play() ];
+              return [ 4, api_1.GameAPI.instance.play(betAmount) ];
 
              case 1:
               return [ 2, _a.sent() ];
@@ -2837,12 +2872,14 @@ window.__require = function e(t, n, r) {
         _this.popupOverlay = null;
         _this.preloadedPopups = [];
         _this._activePopups = new Map();
+        _this._currentPopupName = null;
         return _this;
       }
       PopupManagerComp.prototype.onLoad = function() {
         this.popupContainer || cc.warn("Pls attach popup container here: ", this.node);
         this.preloadPopup();
         this.setOverlay(false);
+        this.popupOverlay && this.popupOverlay.on(cc.Node.EventType.TOUCH_END, this._onOverlayTouched, this);
       };
       PopupManagerComp.prototype.preloadPopup = function() {
         for (var _i = 0, _a = this.preloadedPopups; _i < _a.length; _i++) {
@@ -2859,6 +2896,7 @@ window.__require = function e(t, n, r) {
           _this.setOverlay(false);
         };
         this.setOverlay(true);
+        this._currentPopupName = popupName;
         if (this._activePopups.has(popupName)) {
           this.showActivePopup(popupName, options);
           return;
@@ -2905,6 +2943,10 @@ window.__require = function e(t, n, r) {
       };
       PopupManagerComp.prototype.setOverlay = function(visible) {
         this.popupOverlay && (this.popupOverlay.active = visible);
+        visible || (this._currentPopupName = null);
+      };
+      PopupManagerComp.prototype._onOverlayTouched = function() {
+        this._currentPopupName && this.hidePopup(this._currentPopupName);
       };
       __decorate([ property(cc.Node) ], PopupManagerComp.prototype, "popupContainer", void 0);
       __decorate([ property(cc.Node) ], PopupManagerComp.prototype, "popupOverlay", void 0);
@@ -3196,7 +3238,7 @@ window.__require = function e(t, n, r) {
           onComplete && onComplete();
         });
       };
-      ReelControl9999.prototype.setCascadeQueue = function(cascadeSteps) {
+      ReelControl9999.prototype.setCascadeQueue = function(cascadeSteps, onStepExecute) {
         var _this = this;
         this.commandManager.clearQueue();
         for (var _i = 0, cascadeSteps_1 = cascadeSteps; _i < cascadeSteps_1.length; _i++) {
@@ -3224,7 +3266,7 @@ window.__require = function e(t, n, r) {
             });
           }
           if (0 === reelDataList.length) continue;
-          this.commandManager.enqueue(new CascadeCommands9999_1.CascadeStepCommand(reelDataList, this.node));
+          this.commandManager.enqueue(new CascadeCommands9999_1.CascadeStepCommand(reelDataList, this.node, step, onStepExecute));
         }
         this.commandManager.runQueue(function() {
           cc.log("cascadeAllDone");
@@ -4005,6 +4047,8 @@ window.__require = function e(t, n, r) {
         this.sessionId = null;
         this.defaultProvider = "peterandsons";
         this.defaultGame = "musashi";
+        this._currencyDecimals = 0;
+        this._currencyMultiplier = 1;
         this.token = null;
         this.sessionId = this._generateUUID();
         this.defaultProvider = "peterandsons";
@@ -4075,7 +4119,7 @@ window.__require = function e(t, n, r) {
       GameAPI.prototype.authenticate = function(wallet, operator, key) {
         void 0 === wallet && (wallet = "demo");
         void 0 === operator && (operator = "demo");
-        void 0 === key && (key = "343305068271");
+        void 0 === key && (key = "748116791788");
         return __awaiter(this, void 0, void 0, function() {
           var payload, res;
           return __generator(this, function(_a) {
@@ -4093,6 +4137,10 @@ window.__require = function e(t, n, r) {
              case 1:
               res = _a.sent();
               res && res.token && this.setToken(res.token);
+              if (res && null != res.currencyDecimals) {
+                this._currencyDecimals = res.currencyDecimals;
+                this._currencyMultiplier = Math.pow(10, this._currencyDecimals);
+              }
               return [ 2, res ];
             }
           });
@@ -4133,7 +4181,7 @@ window.__require = function e(t, n, r) {
                 action: "main",
                 complete: complete,
                 asyncWin: asyncWin,
-                bet: bet
+                bet: bet / this._currencyMultiplier
               };
               return [ 4, this._post("/game/play", payload, true) ];
 
@@ -4171,6 +4219,16 @@ window.__require = function e(t, n, r) {
           return v.toString(16);
         });
       };
+      GameAPI.prototype.toDisplayAmount = function(value) {
+        return value * this._currencyMultiplier;
+      };
+      Object.defineProperty(GameAPI.prototype, "currencyMultiplier", {
+        get: function() {
+          return this._currencyMultiplier;
+        },
+        enumerable: false,
+        configurable: true
+      });
       GameAPI._instance = null;
       return GameAPI;
     }();
